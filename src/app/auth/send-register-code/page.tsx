@@ -1,0 +1,112 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useRegisterStore } from "@/app/store/registerStore";
+import FormInput from "@/app/components/inputs/form-input";
+import { toast } from "react-toastify";
+import { sendCodeSchema } from "@/app/utils/validation";
+import { Loader2Icon } from "lucide-react";
+import Link from "next/link";
+import { formatPhone } from "@/app/utils/formatPhone";
+import { api } from "@/app/lib/api/axios";
+
+export default function SendRegisterCode() {
+  const router = useRouter();
+  const {
+    values,
+    setValues,
+    errors,
+    setErrors,
+    resetErrors,
+    loading,
+    setLoading,
+  } = useRegisterStore();
+
+  const handleSendRegisterCode = async () => {
+    setLoading(true);
+    try {
+      // Yup validation
+      resetErrors();
+      await sendCodeSchema.validate(values, { abortEarly: false });
+
+      api
+        .post(`auth/send-register-code`, {
+          phone: values.phone && values.phone.replace(/\s+/g, ""),
+        })
+        .then((res) => {
+          router.push("/auth/verify-register-code");
+
+          setValues("testcode", res.data.code);
+
+          toast.success("კოდი გამოიგზავნა");
+
+          resetErrors();
+        })
+        .catch((error) => {
+          if (error.response.data.message === "Phone already used") {
+            toast.error("ტელეფონის ნომერი გამოყენებულია");
+          } else {
+            toast.error("კოდი ვერ გამოიგზავნა");
+          }
+
+          setErrors("phone", "შეცდომა");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } catch (err: any) {
+      // Yup validation errors
+      if (err.inner) {
+        err.inner.forEach((e: any) => {
+          if (e.path) {
+            setErrors(e.path, e.message);
+            toast.error(e.message);
+          }
+        });
+      }
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full flex flex-col gap-y-5 relative">
+      <h1 className="text-center text-xl sm:text-2xl">
+        რეგისტრაცია
+      </h1>
+      <p className="text-center text-sm">
+        Tech Service-ში რეგისტრაციისთვის საჭიროა ნომრის დადასტურება ვალიდური
+        კოდით
+      </p>
+
+      <FormInput
+        id="phone"
+        value={values.phone || ""}
+        onChange={(e) => setValues("phone", formatPhone(e.target.value))}
+        label="ტელეფონის ნომერი"
+        type="tel"
+        error={errors.phone}
+      />
+
+      <Button
+        onClick={() => {
+          handleSendRegisterCode();
+        }}
+        disabled={loading}
+        className="h-11 cursor-pointer"
+      >
+        {loading && <Loader2Icon className="animate-spin" />}კოდის გაგზავნა
+      </Button>
+
+      {/* Footer link */}
+      <Link
+        href={"/auth/login"}
+        className="absolute bottom-[-95px] self-center mt-3 z-10"
+      >
+        <p className="text-center cursor-pointer border-b-[1px] border-transparent hover:border-gray-700 text-sm text-stroke">
+          გაქვს ანგარიში? - გაიარე ავტორიზაცია
+        </p>
+      </Link>
+    </div>
+  );
+}

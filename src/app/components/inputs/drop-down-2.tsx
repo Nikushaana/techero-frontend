@@ -1,0 +1,92 @@
+"use client";
+
+import * as React from "react";
+import { Loader2Icon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+
+interface DropdownProps {
+  id: string;
+  data: any[];
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSelect: (item: any) => void;
+  label: string;
+  placeholder?: string;
+  error?: string;
+  isLoading?: boolean;
+}
+
+export function Dropdown2({
+  id,
+  data,
+  value,
+  onChange,
+  onSelect,
+  label,
+  placeholder,
+  error,
+  isLoading,
+}: DropdownProps) {
+  const [open, setOpen] = React.useState(false);
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  React.useEffect(() => {
+    if (data?.length > 0 && document.activeElement?.id === id) {
+      setOpen(true);
+    }
+  }, [data, id]);
+
+  return (
+    <div ref={wrapperRef} className="w-full relative">
+      <label className="text-myGray text-[13px]">{label}</label>
+      {isLoading && (
+        <Loader2Icon className="absolute right-[10px] bottom-[10px] pointer-events-none animate-spin w-[15px] h-[15px]" />
+      )}
+      <Input
+        id={id}
+        type="text"
+        value={value}
+        placeholder={placeholder}
+        onChange={onChange}
+        onFocus={() => {
+          if (data?.length > 0) setOpen(true);
+        }}
+        className={`rounded-full text-start border-1 mt-[3px] focus-visible:ring-0 shadow-none px-3 h-9 ${
+          error ? "border-red-500" : "border-gray-300"
+        }`}
+      />
+
+      {open && data?.length > 0 && (
+        <div className="absolute z-20 w-full mt-1 max-h-[140px] overflow-y-scroll rounded-[8px] border-2 border-gray-300 shadow-lg bg-white">
+          {data.map((item, idx) => (
+            <div
+              key={idx}
+              onClick={() => {
+                onSelect(item);
+                setOpen(false);
+              }}
+              className="py-1 px-2 cursor-pointer hover:bg-gray-100 text-sm rounded-[6px]"
+            >
+              {item.name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,100 @@
+"use client";
+
+import React, { useRef } from "react";
+import { Trash2Icon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+interface OrderImagesSelectorProps {
+  newImages: File[]; // newly added but not uploaded
+  images?: string[];
+  setNewImages: {
+    add: (files: File[]) => void;
+    remove: (file: File) => void;
+  };
+  setImages?: {
+    remove: (url: string) => void;
+  };
+}
+
+export default function OrderImagesSelector({
+  newImages,
+  images,
+  setNewImages,
+  setImages,
+}: OrderImagesSelectorProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddFiles = (files: FileList) => {
+    const fileArray = Array.from(files);
+    setNewImages.add(fileArray);
+  };
+
+  return (
+    <div className="flex flex-col">
+      <p
+        onClick={() => inputRef.current?.click()}
+        className="text-myGray text-sm self-start cursor-pointer hover:underline underline md:no-underline"
+      >
+        დაამატე მაქსიმუმ 3 სურათი
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-[5px]">
+        {/* Uploaded images */}
+        {images?.map((url, index) => (
+          <div
+            key={index}
+            className="h-[100px] rounded-lg relative overflow-hidden shadow border-[1px]"
+          >
+            <Button
+              onClick={() => setImages?.remove(url)}
+              variant="secondary"
+              size="icon"
+              className="absolute top-[5px] right-[5px] rounded-lg bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+            >
+              <Trash2Icon className="w-[16px]" />
+            </Button>
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL}/${url}`}
+              loading="lazy"
+              alt="preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+        {/* New images preview */}
+        {newImages.map((file, index) => (
+          <div
+            key={index}
+            className="h-[100px] rounded-lg relative overflow-hidden shadow border-[1px]"
+          >
+            <Button
+              onClick={() => setNewImages.remove(file)}
+              variant="secondary"
+              size="icon"
+              className="absolute top-[5px] right-[5px] rounded-lg bg-red-500 text-white hover:bg-red-600 cursor-pointer"
+            >
+              <Trash2Icon className="size-4" />
+            </Button>
+            <img
+              src={URL.createObjectURL(file)}
+              loading="lazy"
+              alt="preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+
+        {/* Add new images */}
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          style={{ display: "none" }}
+          ref={inputRef}
+          onChange={(e) => {
+            if (e.target.files) handleAddFiles(e.target.files);
+          }}
+        />
+      </div>
+    </div>
+  );
+}

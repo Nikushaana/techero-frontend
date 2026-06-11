@@ -1,4 +1,4 @@
-name: Deploy Frontend to Hetzner
+name: Build and Deploy Frontend
 
 on:
   push:
@@ -6,18 +6,54 @@ on:
       - main # Triggers the workflow every time you push to main
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # Gives GitHub permission to write to GitHub Container Registry (GHCR)
 
     steps:
-      - name: Execute Remote SSH Commands
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/techero-frontend:latest
+          # 👇 ADD THIS BLOCK HERE TO PASS YOUR NEW VARIABLES
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ vars.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+
+  deploy:
+    needs: build-and-push # Ensures deployment only happens if the GitHub build succeeds
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH into Hetzner and Pull New Image
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.INPUT_HOST }}
+          username: ${{ secrets.INPUT_USERNAME }}
+          key: ${{ secrets.INPUT_KEY }}
           script: |
-            cd /var/www/techero-frontend
-            git pull origin main
-            npm run build
-            pm2 restart techero-frontend
+            # 1. Move into your central orchestrator folder
+            cd /var/www/techero-orchestrator
+            
+            # 2. Pull the newly built frontend image from GitHub
+            docker compose pull frontend
+            
+            # 3. Instantly hot-swap the old frontend container with the new one
+            docker compose up -d frontend
+            
+            # 4. Clean up old, unused Docker layers
+            docker image prune -f

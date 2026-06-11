@@ -29,7 +29,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/techero-frontend:latest
+          tags: ghcr.io/nikushaana/techero-frontend:latest
           # 👇 ADD THIS BLOCK HERE TO PASS YOUR NEW VARIABLES
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}

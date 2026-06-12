@@ -1,43 +1,26 @@
-# --- Step 1: Install dependencies ---
-FROM node:20-alpine AS deps
+# Step 1: Build the application
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-
-# --- Step 2: Build the application ---
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# 👇 CRITICAL ADDITION: Receive the keys from GitHub Actions during build time
+# 1. Define the build arguments that Docker should expect
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
-# 👇 CRITICAL ADDITION: Expose them to Next.js compiler process
+# 2. Map those arguments to Environment Variables so Next.js can see them during "npm run build"
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
-# Next.js production build configurations
-ENV NODE_ENV=production
 RUN npm run build
 
-# --- Step 3: Production Runner ---
-FROM node:20-alpine AS runner
+# Step 2: Run the application
+FROM node:20-alpine
 WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Copy essential runtime files from the build stage
-COPY --from=builder /app/public ./public
+COPY package*.json ./
+RUN npm ci --only=production
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
-
-# Expose Next.js default port (matches your Nginx configuration)
+COPY --from=builder /app/public ./public
 EXPOSE 3000
-
-# Run Next.js production server
 CMD ["npm", "start"]

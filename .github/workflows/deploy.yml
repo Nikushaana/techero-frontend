@@ -2,58 +2,68 @@ name: Build and Deploy Frontend
 
 on:
   push:
-    branches:
-      - main # Triggers the workflow every time you push to main
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/nikushaana/techero-frontend
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # Gives GitHub permission to write to GitHub Container Registry (GHCR)
+      packages: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Frontend Image
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
           push: true
-          tags: ghcr.io/nikushaana/techero-frontend:latest
-          # 👇 ADD THIS BLOCK HERE TO PASS YOUR NEW VARIABLES
+          tags: ${{ env.IMAGE_NAME }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          # Injects your environment keys into the Docker build context
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ vars.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
 
   deploy:
-    needs: build-and-push # Ensures deployment only happens if the GitHub build succeeds
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: SSH into Hetzner and Pull New Image
+      - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          # Exposes the GitHub tokens to the SSH script shell context
+          envs: GITHUB_TOKEN,GITHUB_ACTOR
           script: |
-            # 1. Move into your central orchestrator folder
             cd /var/www/techero-orchestrator
-            
-            # 2. Pull the newly built frontend image from GitHub
-            docker compose pull frontend
-            
-            # 3. Instantly hot-swap the old frontend container with the new one
-            docker compose up -d frontend
-            
-            # 4. Clean up old, unused Docker layers
-            docker image prune -f
+            # Authenticates your Ubuntu server with GitHub Container Registry
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+
+            # Pulls down the fresh frontend image and recreates the container
+            docker compose pull
+            docker compose up -d
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}

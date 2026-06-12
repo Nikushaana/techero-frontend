@@ -82,6 +82,8 @@ export default function Header() {
           >
             {currentUser ? "შეავსე განაცხადი" : "ავტორიზაცია"}
           </Button>
+
+          asdasd
           <Link
             href={`/dashboard/${currentUser?.role}/profile`}
             className={`${
